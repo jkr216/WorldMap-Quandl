@@ -1,0 +1,61 @@
+---
+title: "Mapping Quandl Data"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r setup}
+library(rnaturalearth)
+library(sf)
+library(tidyverse)
+library(Quandl)
+
+```
+
+
+```{r}
+world <- ne_countries(type = "countries",  returnclass='sf')
+```
+
+```{r}
+##create shading by GDP
+gdpPal <- colorQuantile("Blues", world$gdp_md_est, n = 20)
+
+##create popup country name and economic stage
+popup <- paste0("<strong>Country: </strong>", 
+                world$name, 
+                "<br><strong>Market Stage: </strong>", 
+                world$income_grp)
+
+leaf_world <- leaflet(world) %>%
+  addProviderTiles("CartoDB.Positron") %>% 
+  setView(lng =  20, lat =  15, zoom = 2) %>%
+      addPolygons(stroke = FALSE, smoothFactor = 0.2, fillOpacity = .7, 
+      # Note the layer ID. Not a country name!
+      color = ~qpal(gdp_md_est), layerId = ~iso_a3, popup = popup)
+
+
+```
+
+```{r}
+econIndicators <- c("GDP Per Capita"= "WWDI/CHN_NY_GDP_PCAP_KN",
+                  "GDP Per Capita Growth" = "WWDI/CHN_NY_GDP_PCAP_KD_ZG",
+                  "Real Interest Rate" = "WWDI/CHN_FR_INR_RINR",
+                  "Exchange Rate" = "WWDI/CHN_PX_REX_REER",
+                  "CPI" = "WWDI/CHN_FP_CPI_TOTL_ZG",
+                  "Labor Force Part. Rate" = "WWDI/CHN_SL_TLF_ACTI_ZS")
+
+Quandl.api_key("d9EidiiDWoFESfdk5nPy")
+
+test<-econIndicators %>% map(Quandl, type = "xts") %>% reduce(merge) %>% `colnames<-`(names(econIndicators))
+
+
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).
