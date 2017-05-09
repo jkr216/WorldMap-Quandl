@@ -2,27 +2,74 @@
 title: "Mapping Quandl Data"
 output: html_notebook
 ---
+In previous posts, we have built a [map to access global ETFs](https://rviews.rstudio.com/2016/12/16/reproducible-finance-with-r-a-shiny-etf-map/) and a simple [Shiny app to import and forecast commodities data from Quandl](https://rviews.rstudio.com/2017/04/21/a-shiny-app-for-importing-and-forecasting-commodities-prices-from-quandl/). Today, we will begin a project that combines those previous apps. Our end goal is to build an interactive map to access macroeconomic data via Quandl, allowing the user to choose an economic indicator and click on a country to access that indicator's time series. For example, if a user wants to import and graph GDP-per-capita data from China, that user will be able to select `GDP per Capita` from a drop down and then click on China to display the time series.  As usual, we'll start with a Notebook for map building, data import and test visualizations.  
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+Careful readers will note that we are not simply reusing code from those previous projects and that is because we are going to introduce some new packages to our toolkit.  Specifically: 
 
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+- Instead of downloading a spatial dataframe from [Natuarl Earth](http://www.naturalearthdata.com/), we will use the new r package [rnaturalearth](https://cran.r-project.org/web/packages/rnaturalearth/rnaturalearth.pdf) and it's function `ne_countries()`. 
+
+- Relatedly, we are not going work with a spatial dataframe but with a simple features dataframe of class `sf`. Learn more [here](https://cran.r-project.org/web/packages/sf/vignettes/sf1.html).
+
+- In this Notebook, when we test our data import of several macroeconomic data sets, we will use the `map()` function from the [purrr](https://cran.r-project.org/web/packages/purrr/purrr.pdf) instead of relying on `lapply()`, as we did previously when passing ticker symbols to `getSymbols()`.
+
+
+Let's get to it! 
+
+In previous work with Quandl, we have imported and visualized global time series, such as the price of oil, gold or copper. By global, I mean these time series are not associated with a particular country. That simplified our job a bit because we did not need to supply a country code to Quandl. That is not the case today.
+
+The World Bank provides great macro data on the country level in its World Development Indicators [WDI](http://data.worldbank.org/products/wdi) data source and that the source we'll access via Quanld today. The Quandl code for the World Bank is WWDI and thus we'll append `WWDI/` to each data set call.
+
+Let's start with a simple example, the same that was mentioned above, and import GDP-per-capita data from China. 
+
+```{r China GDPPC, message = FALSE}
+
+China_GDPPC <- Quandl("WWDI/CHN_NY_GDP_PCAP_KN", type = 'xts') %>% 
+  `colnames<-`("GDP Per Capita")
+
+head(China_GDPPC, n = 6)
+```
+
+```{r Quandl}
+library(Quandl)
+library(purrr)
+econIndicators <- c("GDP Per Capita" = "WWDI/CHN_NY_GDP_PCAP_KN",
+                  "GDP Per Capita Growth" = "WWDI/CHN_NY_GDP_PCAP_KD_ZG",
+                  "Real Interest Rate" = "WWDI/CHN_FR_INR_RINR",
+                  "Exchange Rate" = "WWDI/CHN_PX_REX_REER",
+                  "CPI" = "WWDI/CHN_FP_CPI_TOTL_ZG",
+                  "Labor Force Part. Rate" = "WWDI/CHN_SL_TLF_ACTI_ZS")
+
+Quandl.api_key("d9EidiiDWoFESfdk5nPy")
+
+test <- econIndicators %>% 
+  map(Quandl, type = "xts") %>% 
+  reduce(merge) %>% 
+  `colnames<-`(names(econIndicators))
+
+test$`Real Interest Rate`
+```
 
 ```{r setup}
 library(rnaturalearth)
 library(sf)
 library(tidyverse)
 library(Quandl)
-
+library(dygraphs)
 ```
 
 
-```{r}
+```{r Import SF Object}
+library(rnaturalearth)
+library(sf)
 world <- ne_countries(type = "countries",  returnclass='sf')
 ```
 
-```{r}
+Now we'll create our shading and popups. Note that this code is identical to when we were working with spatial dataframes, of class `sp`, that contained list columns. 
+
+```{r Build Map, message = FALSE, warning=FALSE}
+library(leaflet)
 ##create shading by GDP
-gdpPal <- colorQuantile("Blues", world$gdp_md_est, n = 20)
+gdpPal <- colorQuantile("Purples", world$gdp_md_est, n = 20)
 
 ##create popup country name and economic stage
 popup <- paste0("<strong>Country: </strong>", 
@@ -35,27 +82,16 @@ leaf_world <- leaflet(world) %>%
   setView(lng =  20, lat =  15, zoom = 2) %>%
       addPolygons(stroke = FALSE, smoothFactor = 0.2, fillOpacity = .7, 
       # Note the layer ID. Not a country name!
-      color = ~qpal(gdp_md_est), layerId = ~iso_a3, popup = popup)
+      color = ~gdpPal(gdp_md_est), layerId = ~iso_a3, popup = popup)
 
-
+leaf_world
 ```
+
+Why did we set `layerId = isa_a3`? We had to think back a bit (a very little bit, just one code chunk) and see how Quandl identifies countries. It turns out that Quandl uses the [ISO 3-letter code](https://blog.quandl.com/api-for-economic-data) to identify each country. 
+
+
 
 ```{r}
-econIndicators <- c("GDP Per Capita"= "WWDI/CHN_NY_GDP_PCAP_KN",
-                  "GDP Per Capita Growth" = "WWDI/CHN_NY_GDP_PCAP_KD_ZG",
-                  "Real Interest Rate" = "WWDI/CHN_FR_INR_RINR",
-                  "Exchange Rate" = "WWDI/CHN_PX_REX_REER",
-                  "CPI" = "WWDI/CHN_FP_CPI_TOTL_ZG",
-                  "Labor Force Part. Rate" = "WWDI/CHN_SL_TLF_ACTI_ZS")
-
-Quandl.api_key("d9EidiiDWoFESfdk5nPy")
-
-test<-econIndicators %>% map(Quandl, type = "xts") %>% reduce(merge) %>% `colnames<-`(names(econIndicators))
-
-
+dygraph(test) %>% dySeries("GDP Per Capita",  drawPoints = TRUE, color = "blue") 
 ```
 
-
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
-
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).
