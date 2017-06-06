@@ -1,7 +1,7 @@
 ---
 title: "World Macro Data Download"
 resource_files:
-- WDI-Map-datagrab.Rmd
+- WorldMap-Quandl-Notebook.Rmd
 - wdiMapData.RDat
 runtime: shiny
 output:
@@ -13,10 +13,8 @@ output:
 ```{r setup, include=FALSE}
 # Load packages and initialize data here
 library(Quandl)
-Quandl.api_key("d9EidiiDWoFESfdk5nPy")
 library(tidyverse)
 library(highcharter)
-library(scales)
 library(dygraphs)
 library(leaflet)
 library(countrycode)
@@ -24,6 +22,7 @@ library(data.table)
 library(DT)
 library(lubridate)
 library(xts)
+library(quantmod)
 library(tidyquant)
 ##load data
 load('wdiMapData.RDat')
@@ -176,6 +175,7 @@ renderDataTable({
   map_chr(~paste("WWDI/", countryCode, ., sep="")) %>% 
   
   # Pass them to Quandl via map().
+    
   map(Quandl, type = "xts") %>% 
   
   # Use the reduce() function to combine them into one xts objects.

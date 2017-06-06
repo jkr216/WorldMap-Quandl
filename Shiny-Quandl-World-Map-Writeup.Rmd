@@ -1,0 +1,60 @@
+---
+title: "Shiny + Quandl + World Map Write Up"
+output: html_document
+---
+
+
+## R Markdown
+
+Today we are going to wrap our previous [Quandl/world map Notebook](https://rviews.rstudio.com/2017/05/10/mapping-quandl-macroeconomic-data/) into an interactive Shiny app that lets users choose both a country and a dataset for display. As usual, we did a lot of the heavy lifting in the Notebook to make our work more reproducible and our app more performant. The final app is available [here](http://colorado.rstudio.com:3939/worldmap-quandl-data/). 
+
+Devotees of this Reproducible Finance blog series will note similarities to this [Shiny app](http://colorado.rstudio.com:3939/Global-ETF-Map/), but today's app will have a different and richer functionality set. 
+
+First, we are going to be pulling in data from Quandl, so we won't be using ticker symbols, but rather will be using country codes plus data set codes. 
+
+Second, the user will be able to use the sidebar to select different datasets, rather than being restricted to a country ETF. For example, the user might want to select GDP per capita, or the exchange rate, or any data set that we wish to make available.  There's a tradeoff here between focus and 
+
+Third, we will display a chart using both `dygraphs` and `highcharter`. There's not a practical reason to be doing this beyond that it's a good chance to start exploring highcharter, which is a popular tool in the financial world. 
+
+Lastly, we'll port raw data to a `data.table` and include a few buttons for easy download, in case our end users want to reproduce our the charts or import data for their own work.  We are going to use the `as_tibble` function from the fantastic new [tidyquant](https://cran.r-project.org/web/packages/tidyquant/index.html) package to facilitate our `data.table`, but consider that a teaser to a future post that explores the package in greater depth.  
+
+Let's get to it. 
+
+The first line of substance in this app is to load in the `leaflet` map we constructed in our Notebook.  If you want to refresh on how we did that, have a look back at the previous post. 
+
+To load that map, we run the following: 
+
+```{r, eval = FALSE}
+# Load the .RDat file where the leaflet map is saved.
+load('wdiMapData.RDat')
+```
+
+Now we can access whatever R objects were saved in that file, and this case, that means one R object called `leaf_world`.  That might not be a great name, but it's the leaflet map of the world we build in the Notebook.  When we are ready to build the map in our Shiny app, we'll simply render that object. 
+
+Before we get to the map, though, let's construct is a sidebar where the user can choose which dataset to display. 
+
+```{r, eval = FALSE}
+
+dataChoices <- c("GDP Per Capita" = "_NY_GDP_PCAP_KN",
+                  "GDP Per Capita Growth" = "_NY_GDP_PCAP_KD_ZG",
+                  "Real Interest Rate" = "_FR_INR_RINR",
+                  "Exchange Rate" = "_PX_REX_REER",
+                  "CPI" = "_FP_CPI_TOTL_ZG",
+                  "Labor Force Part. Rate" = "_SL_TLF_ACTI_ZS")
+
+
+selectInput("indicatorSelect", 
+            "Choose an economic indicator",
+            choices = dataChoices,
+            selected = "GDP Per Capita")
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

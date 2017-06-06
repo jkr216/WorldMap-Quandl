@@ -34,7 +34,7 @@ That looks pretty good, but note that the data goes only to December of 2015 - n
 
 Our eventual Shiny app, though, will give the user a choice among many economic time series and we want to test the import and visualiation of all those choices. In addition to GDP-per-capita, let's test GDP-per-capita growth, real interest rate, exchange rate, CPI and labor force participation rate. Those offer a nice snapshot of a country's economy.
 
-To run our test in the code chunk below, we will first build a vector of dataset codes. Note that each of them start with `WWDI/`, then `CHN`, and then the WDI code. Next we will pipe that vector to Quandl using the `map()` function. `map()` takes a function a function, in this case the `Quandl()` function and applies it to the elements in a vector, in this case our vector of dataset codes. We still get to specify `type = "xts"`. 
+To run our test in the code chunk below, we will first build a vector of dataset codes. Note that each of them starts with `WWDI/`, then `CHN`, and then the WDI code. Next we will pipe that vector to Quandl using the `map()` function. `map()` takes a function a function, in this case the `Quandl()` function and applies it to the elements in a vector, in this case our vector of dataset codes. We still get to specify `type = "xts"`. 
 
 If stopped our pipe there, the output would be a list of 6 time series and that would suit our testing purposes but I don't love having to look at a list of 6. Thus, we'll keep on piping and use the `reduce()` function from the purrr package to `merge()` the 6 lists into one xts object. That is much easier to deal with and easier to pass to dygraphs for our test visualization. The last piped function will invoke `colnames<-` to clean up the column names.  
 
@@ -72,9 +72,8 @@ econIndicators2 <- c("GDP Per Capita" = "_NY_GDP_PCAP_KN",
                   "Exchange Rate" = "_PX_REX_REER",
                   "CPI" = "_FP_CPI_TOTL_ZG",
                   "Labor Force Part. Rate" = "_SL_TLF_ACTI_ZS")
-# You might want to supply an api key
-Quandl.api_key("d9EidiiDWoFESfdk5nPy")
 
+library(purrr)
 China_all_indicators2 <- 
   # Start with the vector of Quandl codes
   econIndicators2 %>%
@@ -167,3 +166,7 @@ Because Quandl uses the [ISO 3-letter code](https://blog.quandl.com/api-for-econ
 That's all for today. We'll save that `leaflet_world` object for use in our Shiny app! See you next time. 
 
 
+```{r}
+# Save
+save(leaf_world,  file = 'wdiMapData.RDat')
+```
