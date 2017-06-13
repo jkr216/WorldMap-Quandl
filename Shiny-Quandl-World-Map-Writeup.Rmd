@@ -1,28 +1,26 @@
 ---
 title: "Mapping Quandl Data with Shiny"
 output:
-  pdf_document: default
   html_document: default
 ---
 
-
-Today we are going to wrap our previous [Quandl/world map Notebook](https://rviews.rstudio.com/2017/05/10/mapping-quandl-macroeconomic-data/) into an interactive Shiny app that lets users choose both a country and a data set for display. As usual, we did a lot of the heavy lifting in the Notebook to make our work more reproducible and our app more performant. The final app is available [here](http://colorado.rstudio.com:3939/worldmap-quandl-data/). 
+Today we are going to wrap our previous [Quandl/world map Notebook](https://rviews.rstudio.com/2017/05/10/mapping-quandl-macroeconomic-data/) into an interactive Shiny app that lets users choose both a country and a data set for display. As usual, we did a lot of the heavy lifting in the Notebook to make our work more reproducible and our app more performant. The final app is available [here](http://colorado.rstudio.com:3939/worldmap-quandl-shiny/). 
 
 Devotees of this Reproducible Finance blog series will note similarities to this [Shiny app](http://colorado.rstudio.com:3939/Global-ETF-Map/), but today's app will have a different and richer functionality set. 
 
-First, we are going to be pulling in data from Quandl, so we won't be using ticker symbols, but rather will be using country codes plus data set codes. That would also allow us to open this app up to the vast number of data sets available via Quandl.
+First, we are going to be pulling in data from Quandl, so we won't be using ticker symbols, but rather will be using country codes plus data set codes. That would allow us to open this app to the vast number of data sets available via Quandl.
 
-Second, the user will be able to use the sidebar to select different data sets, rather than being restricted to a country ETF. For example, the user might want to select GDP-per-capita, or the exchange rate, or any data set that we wish to make available.  There's a trade off here between focus and 
+Second, the user will be able to use the sidebar to select different data sets, rather than being restricted to a country ETF. For example, the user might want to select GDP-per-capita, or the exchange rate, or any data set that we wish to make available. Our app today will include 6 economic indicators.  
 
 Third, we will display a chart using `highcharter` instead of `dygraphs`. There's not a substantive reason to be doing this beyond that it's a good chance to start exploring highcharter, which is a popular tool in the financial world. 
 
-Lastly, we'll port raw data to a `data.table` and include a few buttons for easy download, in case our end users want to reproduce our  charts or import data for their own work.  We are going to use the `as_tibble` function from the fantastically useful new [tidyquant](https://cran.r-project.org/web/packages/tidyquant/index.html) package to facilitate our `data.table`, but consider that a teaser to a future post that explores the package in greater depth. In fact, we won't have space to cover the data download section in the post, but all the code is available in the live app. 
+Lastly, we'll port raw data to a `data.table` and include a few buttons for easy download, in case our end users want to reproduce our  charts or import data for their own work.  We are going to use the `as_tibble` function from the fantastically useful new [tidyquant](https://cran.r-project.org/web/packages/tidyquant/index.html) package to facilitate our `data.table`. We won't have space to cover the data download section in this post, but all the code is available in the live app. 
 
-Let's get to it. 
+Without further adieu, let's get to it. 
 
-The first line of substance in this app is to load in the `leaflet` map we constructed in our Notebook. We named the object `leaf_world` and saved it in a file called `wdiMapData.RDat`.  If you want to refresh on how we did that, have a look back at the [previous post](https://rviews.rstudio.com/2017/05/10/mapping-quandl-macroeconomic-data/). Apologies if that sounds tedious but hopefully it emphasizes the workflow of doing the heavy map building in the Notebook when possible. 
+The first line of substance in this app is to load in the `leaflet` map we constructed in our Notebook. We named the object `leaf_world` and saved it in a file called `wdiMapData.RDat`.  If you want to refresh on how we did that, have a look back at the [previous post](https://rviews.rstudio.com/2017/05/10/mapping-quandl-macroeconomic-data/). Apologies if that sounds tedious but hopefully it emphasizes the workflow of doing the heavy map-building in the Notebook when possible. If you or your team ever want to use that map as the basis for another Shiny app, that Notebook will be convenient to reuse. 
 
-To load that map, we run the following: 
+To load our map, we run the following: 
 
 ```{r, eval = FALSE}
 # Load the .RDat file where the leaflet map is saved.
@@ -33,7 +31,7 @@ Now we can access whatever R objects were saved in that file and, in this case, 
 
 Before we get to the map, though, let's construct a sidebar where the user can choose which data set to display. We are going to be working with a macroeconomic data source from the World Bank called World Development Indicators [WDI](http://data.worldbank.org/products/wdi).  The Quandl code for WDI is `WWDI` and thus we'll append `WWDI/` to each data set call - but note that this will not appear in the sidebar because we won't actually pass any data to Quandl there. We have to wait for the user to click on a county and thus will handle the data passing in a future code chunk. This sidebar has one purpose, for the user to select the code for the economic indicator.
 
-We want to give the user a drop down of choices, but we don't want the choices to be the Quandl codes. We want the choices to be the familiar name of the data set. In other words, the user will see as a choice 'GDP Per Capita', instead of the Quandl code `_NY_GDP_PCAP_KN`. For that reason, we'll first create an object called  `dataChoices` that holds our name-value pairs. The name is the familiar title of the time series - for example, 'GDP Per Capita` - and the value is the Quandl code. 
+We want to give the user a drop down of choices, but we don't want the choices to be the Quandl codes. We want the choices to be the familiar names of the data sets. In other words, the user will see as a choice 'GDP Per Capita', instead of the Quandl code `_NY_GDP_PCAP_KN`. For that reason, we'll first create an object called  `dataChoices` that holds our name-value pairs. The name is the familiar title of the time series - for example, 'GDP Per Capita` - and the value is the Quandl code. 
 
 ```{r, eval = FALSE}
 
@@ -51,11 +49,12 @@ Next, in our `selectInput` statement, we will set choices equal to `dataChoices`
 
 selectInput("indicatorSelect", 
             "Choose an economic indicator",
+            # Give the user a choice from the object we created above.
             choices = dataChoices,
             selected = "GDP Per Capita")
 ```
 
-Our simple sidebar is finished and the end result is that when a user makes a choice, we have an input reactive with the value of the data set code.  Let's put that code aside for a minute and turn our attention to the map. That might be a bit of a confusing workflow but it's the order in which the user will experience our app: first choose an indicator, then click the map.
+Our simple sidebar is finished and the end result is that when a user makes a choice, we have an input reactive with the value of the data set code.  Let's put that code aside for a minute and turn our attention to the map.
 
 Remember, we did the map-building work on this in our [Notebook](https://rviews.rstudio.com/2017/05/10/mapping-quandl-macroeconomic-data/), then loaded the object in the `setup` code chunk. That leaves us with a simple call to `renderLeaflet()` to pass it `leaf_world`.
 
@@ -72,7 +71,7 @@ Alright, that wasn't too cumbersome and perhaps the simplicity of that step make
 And now the fun part, wherein we build the machinery to let a user click the map and grab data from Quandl. We will proceed in four steps: 
 
 - capture the country code of the country that gets clicked
-- call on the economic time series that the user selected in the sidebar
+- call the economic time series that the user selected in the sidebar
 - paste the country code and the time series together to create one data set code
 - pass that one data set code to Quandl and import the time series
 
@@ -97,11 +96,11 @@ Next, we need to append that country code to the data set code.  Recall that the
 indicatorValue <- reactive({input$indicatorSelect})
 ```
 
-Let's pause and take inventory of what we have captured thus far: the country code from the click on the map, and the data set code from the sidebar. Now we want to paste those together and pass them to Quandl. We'll do that via another `reactive`, but we are also going to pass that pasted chain to Quandl in the reactive. Thus, the chunk below has one `reactive` that does two things. 
+Let's pause and take inventory of what we have captured thus far: the country code from the click on the map is stored as `clickedCountry()`, and the data set code from the sidebar is stored as `indicatorValue()`. Now we want to paste those together and pass them to Quandl. We'll do that via another `reactive`, but we are also going to pass that pasted chain to Quandl in the reactive. Thus, the chunk below has one `reactive` that does two things. 
 
 First, it pastes together our inputs to form one data set code. Second, it passes that code to Quandl and returns the desired time series. 
 
-Notice that when we paste the codes together, we start with 'WWDI/'. That's because all of our data comes from the 'WWDI' data source on Quandl. We are not letting the user choose a different data source. We could have done so in the sidebar, but consider how that would have complicated our data set code `reactive` input in the sidebar.
+Notice that when we paste the codes together, we start with `WWDI/`. That's because all of our data comes from the WWDI data source on Quandl. We are not letting the user choose a different data source. We could have done so in the sidebar, but consider how that would have complicated our data set code `reactive` input in the sidebar.
 
 Back to our data import chunk wherein we create our data set code by pasting inputs together and then pass them to Quandl:
 
@@ -121,13 +120,13 @@ countryData <- reactive({
 })  
 ```
 
-We now have an object call `countryData` that is an `xts` object imported from Quandl. It holds the time series from the WWDI data source, for the country that was clicked, for the economic indicator that was chosen in the sidebar. From a data import perspective, we're done. We could fit a model to this data, run forecasts, etc., but I am going to head straight to visualization using `highcharter`.
+We now have an object called `countryData` that is an `xts` object imported from Quandl. It holds the time series (1) from the WWDI data source, (2) for the country that was clicked,  (3) for the economic indicator that was chosen in the sidebar. From a data import perspective, we're done. We could fit a model to this data, run forecasts, etc., but I am going to head straight to visualization using `highcharter`.
 
 As mentioned at the outset, `dygraph` would have done a fine job here but `highcharter` seems to be a more popular visualization tool in the financial industry, and that's a good reason to start exploring its capabilities. 
 
-The code chunk below might look heavy but most of the lines are for aesthetics, like a nice title and removing scroll bars that seem clunky to me. The key statements below are `highchart(type = "stock")` and `hc_add_series(countryData())`.  
+The code chunk below might look heavy but most of the lines are for aesthetics, creating a nice title and removing scroll bars that seem clunky to me. The key substantive statements below are `highchart(type = "stock")` and `hc_add_series(countryData())`.  
 
-The first statement tells highcharter to use its built-in stock format (this is good for  graphing all sorts of economic time series, not just stocks) and the second passes our data object to the graphing function `hc_add_series`.  It's a well-named function because it adds a series to the chart.  If we wanted to include another series, we would use that same function and pass it another `xts` object.  
+The first statement tells highcharter to use its built-in stock format (this is good for graphing all sorts of economic time series, not just stocks) and the second passes our data object to the graphing function `hc_add_series`.  It's a well-named function because it adds a series to the chart.  If we wanted to include another series, we would use that same function and pass it another `xts` object.  
 
 ```{r, eval = FALSE}
 output$highchart <- renderHighchart({
