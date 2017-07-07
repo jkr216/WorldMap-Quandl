@@ -138,7 +138,7 @@ Now we'll create our shading and popups. Note that this code is identical to whe
 ```{r Build Map, message = FALSE, warning = FALSE}
 library(leaflet)
 ##create shading by GDP
-gdpPal <- colorQuantile("Purples", world$gdp_md_est, n = 20)
+gdpPal <- colorQuantile("Blues", world$gdp_md_est, n = 20)
 
 ##create popup country name and economic stage
 popup <- paste0("<strong>Country: </strong>", 

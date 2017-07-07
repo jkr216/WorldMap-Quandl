@@ -1,8 +1,5 @@
 ---
 title: "World Macro Data Download"
-resource_files:
-- WorldMap-Quandl-Notebook.Rmd
-- wdiMapData.RDat
 runtime: shiny
 output:
   flexdashboard::flex_dashboard:
@@ -20,14 +17,31 @@ library(leaflet)
 library(countrycode)
 library(data.table)
 library(DT)
-library(lubridate)
-library(xts)
-library(quantmod)
 library(tidyquant)
+library(rnaturalearth)
+library(sf)
+library(rgeos)
 
-# load data
-load('wdiMapData.RDat')
+# You might want to supply an api key
+Quandl.api_key("d9EidiiDWoFESfdk5nPy")
 
+# load data if pushing to Connect. won't work on shinyapps.io
+#load('map-data/wdiMapData.RDat')
+world <- ne_countries(type = "countries",  returnclass='sf')
+gdpPal <- colorQuantile("Blues", world$gdp_md_est, n = 20)
+
+##create popup country name and economic stage
+popup <- paste0("<strong>Country: </strong>", 
+                world$name, 
+                "<br><strong>Market Stage: </strong>", 
+                world$income_grp)
+
+leaf_world <- leaflet(world) %>%
+  addProviderTiles("CartoDB.Positron") %>% 
+  setView(lng =  20, lat =  15, zoom = 2) %>%
+      addPolygons(stroke = FALSE, smoothFactor = 0.2, fillOpacity = .7, 
+      # Note the layer ID. Not a country name! It's a country code! 
+      color = ~gdpPal(gdp_md_est), layerId = ~iso_a3, popup = popup)
 ```
 
 
