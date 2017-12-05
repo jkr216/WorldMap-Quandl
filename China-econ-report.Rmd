@@ -1,0 +1,96 @@
+---
+output: 
+  flexdashboard::flex_dashboard:
+    source_code: embed
+---
+
+```{r setup, include=FALSE}
+devtools::install_github("yihui/knitr")
+
+library(flexdashboard)
+library(Quandl)
+library(tidyverse)
+library(highcharter)
+library(leaflet)
+library(countrycode)
+library(data.table)
+library(DT)
+library(tidyquant)
+library(timetk)
+
+knitr::opts_chunk$set(message=FALSE, warning=FALSE)
+
+# You might want to supply an api key
+Quandl.api_key("d9EidiiDWoFESfdk5nPy")
+
+# load data if pushing to Connect. 
+load('map-data/wdiMapData.RDat')
+
+econIndicators2 <- c("GDP Per Capita" = "_NY_GDP_PCAP_KN",
+                  "GDP Per Capita Growth" = "_NY_GDP_PCAP_KD_ZG",
+                  "Real Interest Rate" = "_FR_INR_RINR",
+                  "Exchange Rate" = "_PX_REX_REER",
+                  "CPI" = "_FP_CPI_TOTL_ZG",
+                  "Labor Force Part. Rate" = "_SL_TLF_ACTI_ZS")
+
+countryCode <- "CHN"
+
+country_all_indicators2 <- 
+  # Start with the vector of Quandl codes
+  econIndicators2 %>%
+  map_chr(~paste("WWDI/", countryCode, ., sep="")) %>% 
+  # Pass them to Quandl via map().
+  map(Quandl, type = "xts") %>% 
+  
+  # Use the reduce() function to combine them into one xts objects.
+  reduce(merge) %>% 
+  # Use the names from the original vector to set nicer column names.
+  `colnames<-`(names(econIndicators2))
+```
+
+Report for China {data-orientation=rows}
+=====================================
+
+Row {data-height=500}
+-------------------------------------
+
+### World Map Shaded by GDP
+
+```{r}
+leaf_world
+```
+
+
+
+Row 
+------------------------------------- 
+
+### GDP per capita for China
+
+```{r}
+highchart(type = "stock") %>% 
+  hc_title(text = "Charting Econ Data From Quandl") %>% 
+  hc_subtitle(text = "Data extracted using Quandl package") %>% 
+  hc_add_series(country_all_indicators2[, "GDP Per Capita Growth"], 
+                name = "GDP Per Capita Growth") %>% 
+  hc_add_series(country_all_indicators2[, "Real Interest Rate"], 
+                name = "Real Interest Rate") 
+```
+
+Data
+=====================================
+
+### Data
+
+```{r}
+country_all_indicators2 %>% 
+  tk_tbl(preserve_index = TRUE, rename_index = "date") %>%
+  arrange(desc(date)) %>% 
+  mutate_each(funs(./100), c(3,4,6,7)) %>% 
+  datatable(., fillContainer = TRUE, extensions = 'Buttons', 
+            options = list(dom = 'Bfrtip', 
+                           buttons = c('copy', 'csv', 'excel', 'pdf', 'print'))) %>% 
+  formatPercentage(c(3, 4, 6, 7), digits = 2) %>% 
+  formatCurrency(c(2, 5), digits = 2)
+```
+

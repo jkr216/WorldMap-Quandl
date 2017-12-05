@@ -1,0 +1,114 @@
+---
+output: 
+  flexdashboard::flex_dashboard:
+    source_code: embed
+params:
+  countryCode:
+    label: "countryCode"
+    value: "CHN"
+    input: text
+  wwdi1:
+    label: "wwdi1"
+    value: "GDP Per Capita Growth"
+    input: select
+    choices: ["GDP Per Capita", "GDP Per Capita Growth", "Real Interest Rate", "Exchange Rate", "CPI", "Labor Force Part. Rate"]
+  wwdi2:
+    label: "wwdi2"
+    value: "Real Interest Rate"
+    input: select
+    choices: ["GDP Per Capita", "GDP Per Capita Growth", "Real Interest Rate", 
+    "Exchange Rate", "CPI", "Labor Force Part. Rate"]
+---
+
+
+```{r setup, include=FALSE}
+devtools::install_github("yihui/knitr")
+devtools::install_github("yihui/rmarkdown")
+devtools::install_github("rstudio/flexdashboard")
+library(Quandl)
+library(tidyverse)
+library(highcharter)
+library(leaflet)
+library(countrycode)
+library(data.table)
+library(DT)
+library(tidyquant)
+library(timetk)
+
+knitr::opts_chunk$set(message=FALSE, warning=FALSE)
+
+# You might want to supply an api key
+Quandl.api_key("d9EidiiDWoFESfdk5nPy")
+
+# load data if pushing to Connect. won't work on shinyapps.io
+load('map-data/wdiMapData.RDat')
+
+econIndicators2 <- c("GDP Per Capita" = "_NY_GDP_PCAP_KN",
+                  "GDP Per Capita Growth" = "_NY_GDP_PCAP_KD_ZG",
+                  "Real Interest Rate" = "_FR_INR_RINR",
+                  "Exchange Rate" = "_PX_REX_REER",
+                  "CPI" = "_FP_CPI_TOTL_ZG",
+                  "Labor Force Part. Rate" = "_SL_TLF_ACTI_ZS")
+
+countryCode <- params$countryCode
+
+country_all_indicators2 <- 
+  # Start with the vector of Quandl codes
+  econIndicators2 %>%
+  map_chr(~paste("WWDI/", countryCode, ., sep="")) %>% 
+  # Pass them to Quandl via map().
+  map(Quandl, type = "xts") %>% 
+  
+  # Use the reduce() function to combine them into one xts objects.
+  reduce(merge) %>% 
+  # Use the names from the original vector to set nicer column names.
+  `colnames<-`(names(econIndicators2))
+```
+
+
+Report for `r params$countryCode` {data-orientation=rows}
+=====================================
+
+Row {data-height=500}
+-------------------------------------
+
+### World Map Shaded by GDP
+
+```{r}
+leaf_world
+```
+
+
+Row 
+------------------------------------- 
+
+### GDP per capita for `r params$countryCode`
+
+```{r}
+highchart(type = "stock") %>% 
+  hc_title(text = paste("Data for", params$countryCode, sep=" ")) %>% 
+  hc_subtitle(text = "Data extracted using Quandl package") %>% 
+  hc_add_series(country_all_indicators2[, params$wwdi1], name = params$wwdi1) %>% 
+  hc_add_series(country_all_indicators2[, params$wwdi2], name = params$wwdi2) %>% 
+  hc_navigator(enabled = FALSE) %>% 
+  hc_scrollbar(enabled = FALSE) 
+
+```
+
+Raw Data Download
+============================
+
+### Raw Data
+
+```{r}
+country_all_indicators2 %>% 
+  tk_tbl(preserve_index = TRUE, rename_index = "date") %>%
+  arrange(desc(date)) %>% 
+  mutate_each(funs(./100), c(3,4,6,7)) %>% 
+  datatable(., fillContainer = TRUE, extensions = 'Buttons', 
+            options = list(dom = 'Bfrtip', 
+                           buttons = c('copy', 'csv', 'excel', 'pdf', 'print'))) %>% 
+  formatPercentage(c(3, 4, 6, 7), digits = 2) %>% 
+  formatCurrency(c(2, 5), digits = 2)
+```
+

@@ -1,15 +1,16 @@
 ---
-title: "World Macro Data Download"
+title: "Mapping Quandl Data with Shiny"
 resource_files:
-- wdiMapData.RDat
+- data/wdiMapData.RDat
 runtime: shiny
 output:
   flexdashboard::flex_dashboard:
     source_code: embed
-    
+    vertical_layout: fill
 ---
 
-```{r setup, include=FALSE}
+```{r setup}
+
 # Load packages and initialize data here
 library(Quandl)
 library(tidyverse)
@@ -18,13 +19,33 @@ library(leaflet)
 library(countrycode)
 library(data.table)
 library(DT)
-library(lubridate)
-library(xts)
 library(quantmod)
 library(tidyquant)
+library(rnaturalearth) # maps of world
+library(tigris) # maps of usa
+library(sf)
+# You might want to supply an api key
+Quandl.api_key("d9EidiiDWoFESfdk5nPy")
 
-# load data
-load('wdiMapData.RDat')
+world <- ne_countries(type = "countries",  returnclass='sf')
+
+##create shading by GDP
+gdpPal <- colorQuantile("Blues", world$gdp_md_est, n = 20)
+
+##create popup country name and economic stage
+popup <- paste0("<strong>Country: </strong>", 
+                world$name, 
+                "<br><strong>Market Stage: </strong>", 
+                world$income_grp)
+
+leaf_world <- leaflet(world) %>%
+  addProviderTiles("CartoDB.Positron") %>% 
+  setView(lng =  20, lat =  15, zoom = 2) %>%
+      addPolygons(stroke = FALSE, smoothFactor = 0.2, fillOpacity = .7, 
+      # Note the layer ID. Not a country name! It's a country code! 
+      color = ~gdpPal(gdp_md_est), layerId = ~iso_a3, popup = popup)
+
+leaf_world
 
 ```
 

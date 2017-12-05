@@ -4,12 +4,13 @@ runtime: shiny
 output:
   flexdashboard::flex_dashboard:
     source_code: embed
+    vertical_layout: fill
     
 ---
 
 ```{r setup, include=FALSE}
+devtools::install_github("rstudio/shiny")
 # Load packages and initialize data here
-library(Quandl)
 library(tidyverse)
 library(highcharter)
 library(dygraphs)
@@ -18,30 +19,15 @@ library(countrycode)
 library(data.table)
 library(DT)
 library(tidyquant)
-library(rnaturalearth)
-library(sf)
-library(rgeos)
+library(timetk)
+library(Quandl)
 
 # You might want to supply an api key
 Quandl.api_key("d9EidiiDWoFESfdk5nPy")
 
 # load data if pushing to Connect. won't work on shinyapps.io
-#load('map-data/wdiMapData.RDat')
-world <- ne_countries(type = "countries",  returnclass='sf')
-gdpPal <- colorQuantile("Blues", world$gdp_md_est, n = 20)
+load('map-data/wdiMapData.RDat')
 
-##create popup country name and economic stage
-popup <- paste0("<strong>Country: </strong>", 
-                world$name, 
-                "<br><strong>Market Stage: </strong>", 
-                world$income_grp)
-
-leaf_world <- leaflet(world) %>%
-  addProviderTiles("CartoDB.Positron") %>% 
-  setView(lng =  20, lat =  15, zoom = 2) %>%
-      addPolygons(stroke = FALSE, smoothFactor = 0.2, fillOpacity = .7, 
-      # Note the layer ID. Not a country name! It's a country code! 
-      color = ~gdpPal(gdp_md_est), layerId = ~iso_a3, popup = popup)
 ```
 
 
@@ -180,11 +166,6 @@ renderDataTable({
     
   countryCode <- as.character(clickedCountry())
   
-  indicatorValue <- as.character(input$indicatorSelect)
-  
-  indicatorName <- names(dataChoices[dataChoices == input$indicatorSelect])
-  #datachoices = dataChoices
-  countryData <- 
   
   # Start with the vector of Quandl codes
   dataChoices %>%
@@ -200,8 +181,8 @@ renderDataTable({
   reduce(merge) %>% 
   # Use the names from the original vector to set nicer column names.
   `colnames<-`(names(dataChoices)) %>% 
-  as_tibble(preserve_row_names = TRUE) %>%
-  rename(date = row.names) %>% 
+  tk_tbl(preserve_index = TRUE, rename_index = "date") %>%
+  arrange(desc(date)) %>% 
   mutate_each(funs(./100), c(3,4,6,7)) %>% 
   datatable(., fillContainer = TRUE, extensions = 'Buttons', 
             options = list(dom = 'Bfrtip', 
